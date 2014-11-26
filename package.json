@@ -1,0 +1,31 @@
+{
+  "name": "angular-file-service",
+  "version": "0.1.0",
+  "description": "an angular service for operating File",
+  "main": "angular-file-service.js",
+  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jcppman/angular-file-service"
+  },
+  "keywords": [
+    "angular",
+    "file",
+    "service"
+  ],
+  "author": "Chriest Yu <jcppman@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/jcppman/angular-file-service/issues"
+  },
+  "homepage": "https://github.com/jcppman/angular-file-service",
+  "dependencies": {
+    "spark-md5": "0.0.5"
+  },
+  "devDependencies": {
+    "gulp": "^3.8.10",
+    "gulp-concat": "^2.4.2",
+    "gulp-rename": "^1.2.0",
+    "gulp-uglify": "^1.0.1"
+  }
+}
