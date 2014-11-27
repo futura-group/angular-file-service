@@ -11,7 +11,7 @@ angular.module('angular.file', [])
             this.status = 'init';
             this.messages = [];
         }
-        FileOperator.prototype.read = function () {
+        FileOperator.prototype.read = function (start, end) {
             var that = this;
             return $q(function (resolve, reject) {
                 if(!that.file) {
@@ -29,7 +29,16 @@ angular.module('angular.file', [])
                 fileReader.onabort = function (msg) {
                     resolve(msg);
                 };
-                fileReader.readAsArrayBuffer(that.file);
+                if(start || end) {
+                    start = start ? 0 : start;
+                    if(end) {
+                        fileReader.readAsArrayBuffer(that.file.slice(start, end));
+                    } else {
+                        fileReader.readAsArrayBuffer(that.file.slice(start));
+                    }
+                } else {
+                    fileReader.readAsArrayBuffer(that.file);
+                }
             });
         };
         FileOperator.prototype.abort = function () {

@@ -24,7 +24,7 @@
                     var fileOnDom = $document.find('input')[0];
                     var file = fileOperator(fileOnDom.files[0]);
                     file.read().then(function () {
-                        $scope.base64 = file.getBase64();
+                        //$scope.base64 = file.getBase64();
                         $scope.md5 = file.getMd5();
                         $scope.fileSize = file.fileSize;
                     });

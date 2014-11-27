@@ -40,19 +40,31 @@ app.controller('myController', ['$document', 'fileOperator', function ($document
 
 file interface has these operators:
 
-- `read`: return a promise which will be resolved once the file is fully loaded,
-  and will be rejected if something goes wrong
+- `read(start, end)`: read a chunk start from `start` to `end` (excluded),
+   return a promise which will be resolved once the file is fully loaded,
+   and will be rejected if something goes wrong
 - `abort`: cancel the loading process and **resolve** the promise.
 
-the file interface has these getters:
+and these getters:
 
-- `getBase64`
-- `getMd5`
-- `getUint8Array`
-- `getArrayBuffer` (**May cause memory copy if `length` and `start` are given,
+- `getBase64([start, [legth]])`
+- `getMd5([start, [legth]])`
+- `getUint8Array([start, [legth]])`
+- `getArrayBuffer([start, [legth]])` (**May cause memory copy if `length` and `start` are given,
    use carefully if file is huge**)
 
-all getters accept two optional arguments `[start, [length]]`
+one important detail is that `start` and `length` in getters are based on the
+current slice, not the whole file. So if you:
+
+```javascript
+// Read part of the file
+file.read(100, 500).then(function () {
+    var base64 = file.getBase64(50, 100);
+    // the base64 string is the data from (50th to 100th) byte
+    // of current slice, so it is the (100+50)th to (100+50+100)th byte
+    // in the original file
+});
+```
 
 ## Credit
 
@@ -70,3 +82,4 @@ instead of the original one.
 - Chriest Yu <jcppman@gmail.com>
 
 **Issues & PRs are welcome!**
+
