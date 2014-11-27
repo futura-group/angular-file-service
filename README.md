@@ -40,7 +40,7 @@ app.controller('myController', ['$document', 'fileOperator', function ($document
 
 file interface has these operators:
 
-- `read(start, end)`: read a chunk start from `start` to `end` (excluded),
+- `read([start, [end]])`: read a chunk start from `start` to `end` (excluded),
    return a promise which will be resolved once the file is fully loaded,
    and will be rejected if something goes wrong
 - `abort`: cancel the loading process and **resolve** the promise.
