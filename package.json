@@ -19,9 +19,6 @@
     "url": "https://github.com/jcppman/angular-file-service/issues"
   },
   "homepage": "https://github.com/jcppman/angular-file-service",
-  "dependencies": {
-    "spark-md5": "0.0.5"
-  },
   "devDependencies": {
     "gulp": "^3.8.10",
     "gulp-concat": "^2.4.2",

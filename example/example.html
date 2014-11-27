@@ -1,0 +1,35 @@
+<!doctype html>
+<html ng-app="example">
+<head>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.4/angular.min.js"></script>
+    <script src="../dist/angular-file-service.js"></script>
+</head>
+<body ng-controller="exampleController">
+    <input type="file" id="target_file"></input>
+    <button ng-click="loadFile()">Load</button>
+    <div>
+        <p><h3>FileSize</h3>{{fileSize}}</p>
+        <p><h3>Base64</h3>{{base64}}</p>
+        <p><h3>MD5</h3>{{md5}}</p>
+        <p>Generate the base64 of the whole file is problematic and might crash your browser if the file is too big. It would be find if you generate it part by part.</p>
+    </div>
+    <script type="text/javascript">
+        var app = angular.module('example', [ 'angular.file' ]);
+        app.controller('exampleController', [
+            '$scope',
+            '$document',
+            'fileOperator',
+            function ($scope, $document, fileOperator) {
+                $scope.loadFile = function () {
+                    var fileOnDom = $document.find('input')[0];
+                    var file = fileOperator(fileOnDom.files[0]);
+                    file.read().then(function () {
+                        $scope.base64 = file.getBase64();
+                        $scope.md5 = file.getMd5();
+                        $scope.fileSize = file.fileSize;
+                    });
+                };
+            }]);
+    </script>
+</body>
+</html>

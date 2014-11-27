@@ -6,7 +6,7 @@ var sourcemaps = require('gulp-sourcemaps');
 
 gulp.task('build', function () {
     return gulp.src([
-        'node_modules/spark-md5/spark-md5.js',
+        'lib/md5.js',
         'angular-file-service.js'
     ])
     .pipe(sourcemaps.init())
