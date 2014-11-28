@@ -66,6 +66,12 @@ file.read(100, 500).then(function () {
 });
 ```
 
+file interface has these properties:
+- `file`: the file you passed in
+- `fileSize`: once the file is loaded, it represent the file size in bytes
+- `buffer`: the buffer of the file, same result as `getArrayBuffer()`
+- `messages`: all messages from File API
+
 ## Credit
 
 In order to avoid uneccesary memory copy, some modification has been 

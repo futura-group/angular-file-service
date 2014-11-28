@@ -8,7 +8,6 @@ angular.module('angular.file', [])
             this.file = file;
             this.buffer = null;
             this.fileSize = 0;
-            this.status = 'init';
             this.messages = [];
         }
         FileOperator.prototype.read = function (start, end) {
