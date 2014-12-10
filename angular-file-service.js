@@ -51,7 +51,7 @@ angular.module('angular.file', [])
         };
         FileOperator.prototype.getUint8Array = function (start, length) {
             return this.getArrayBuffer(start, length).then(function (array) {
-                return new Unit8Array(array);
+                return new Uint8Array(array);
             });
         };
         FileOperator.prototype.getBase64 = function (start, length) {
