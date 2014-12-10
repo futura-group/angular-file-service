@@ -3,15 +3,18 @@ var concat = require('gulp-concat');
 var rename = require('gulp-rename');
 var uglify = require('gulp-uglify');
 var sourcemaps = require('gulp-sourcemaps');
+var source = require('vinyl-source-stream');
+var buffer = require('vinyl-buffer');
+var browserify = require('browserify');
 
 gulp.task('build', function () {
-    return gulp.src([
-        'lib/md5.js',
-        'angular-file-service.js'
-    ])
+    browserify({
+        entries: ['./angular-file-service.js']
+    }).bundle()
+    .pipe(source('angular-file-service.js'))
+    .pipe(gulp.dest('dist'))
+    .pipe(buffer())
     .pipe(sourcemaps.init())
-        .pipe(concat('angular-file-service.js'))
-        .pipe(gulp.dest('dist'))
         .pipe(uglify())
     .pipe(sourcemaps.write())
     .pipe(rename({

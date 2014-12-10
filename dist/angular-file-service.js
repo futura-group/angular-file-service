@@ -1,3 +1,194 @@
+(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+var SparkMD5 = require('spark-md5');
+var base64 = require('base64-arraybuffer').encode;
+angular.module('angular.file', [])
+    .factory('fileOperator', ['$window', '$q', function ($window, $q) {
+        function FileOperator (file, maxChunkSize) {
+            this.file = file;
+            this.fileSize = (file && file.size) || 0;
+            this.messages = [];
+            // this property will only affect MD5 calculation
+            this.maxChunkSize = maxChunkSize || 1048576;
+        }
+        FileOperator.prototype.read = function (start, end) {
+            var that = this;
+            var fileReader = new $window.FileReader();
+            return $q(function (resolve, reject) {
+                var fileChunk;
+                if(!that.file) {
+                    return reject(new Error('read','invalid file instance'));
+                }
+                // bind onloadend handler 
+                fileReader.onloadend = function (msg) {
+                    resolve(fileReader.result);
+                };
+                fileReader.onerror = function (msg) {
+                    reject(new Error('read', msg));
+                };
+                fileReader.onabort = function (msg) {
+                    reject(msg);
+                };
+
+                // use slice.appy to handle three situation:
+                // - both `start` and `end` are not given
+                // - only `start` is given
+                // - both `start` and `end` are given
+                fileChunk = $window.File.prototype.slice.apply(
+                    that.file, 
+                    [start, end]
+                );
+
+                fileReader.readAsArrayBuffer(fileChunk);
+            });
+        };
+        FileOperator.prototype.abort = function () {
+            fileReader.abort();
+        };
+        FileOperator.prototype.getArrayBuffer = function (start, length) {
+            var params = this.correctRange(start, length);
+            start = params.start;
+            length = params.length;
+            return this.read(start, start + length);
+        };
+        FileOperator.prototype.getUint8Array = function (start, length) {
+            return this.getArrayBuffer(start, length).then(function (array) {
+                return new Unit8Array(array);
+            });
+        };
+        FileOperator.prototype.getBase64 = function (start, length) {
+            return this.getArrayBuffer(start, length).then(function (array) {
+                return base64(array);
+            });
+        };
+        FileOperator.prototype.getMd5 = function (start, length) {
+            var params = this.correctRange(start, length);
+            start = params.start;
+            length = params.length;
+
+            // if require length is acceptable, get MD5 directly
+            if(length < this.maxChunkSize) {
+                return $q.when(
+                    SparkMD5.ArrayBuffer.hash(
+                        this.getUint8Array(start, length)
+                    )
+                );
+            }
+            // otherwise calculate MD5 incrementally
+            return this.incMd5(start, length);
+        };
+        FileOperator.prototype.incMd5 = function (start, length) {
+            var that = this;
+            var chunkSize = that.maxChunkSize;
+            var fileSize = that.fileSize;
+            var spark = new SparkMD5.ArrayBuffer();
+
+            var deferred = $q.defer();
+
+            calculate(start, function (err, result) {
+                if (err) {
+                    return deferred.reject(err);
+                }
+                return deferred.resolve(result);
+            });
+
+            function calculate (now, done) {
+                deferred.notify(now/fileSize);
+                if(now > fileSize) {
+                    return done(null, spark.end());
+                }
+                // get arraybuffer
+                that.getArrayBuffer(now, chunkSize).then(function (array) {
+                    spark.append(array);
+                    return calculate(now + chunkSize, done);
+                }, function (msg) {
+                    return done(msg);
+                });
+            }
+
+            return deferred.promise;
+
+        };
+        FileOperator.prototype.correctRange = function (start, length) {
+            var fileSize = this.fileSize;
+            start = (start && (start > 0)) ? start : 0;
+            length = (length && (start + length < fileSize)) ? length : fileSize - start;
+            return {
+                start: start,
+                length: length
+            };
+        };
+
+        return function ServiceConstructor(file, maxChunkSize) {
+            // When invoke this service, it will return a function,
+            // service user can use it as a file loader, which will
+            // return a file operator instance 
+            return new FileOperator(file, maxChunkSize);
+        };
+
+    }]);
+
+},{"base64-arraybuffer":2,"spark-md5":3}],2:[function(require,module,exports){
+/*
+ * base64-arraybuffer
+ * https://github.com/niklasvh/base64-arraybuffer
+ *
+ * Copyright (c) 2012 Niklas von Hertzen
+ * Licensed under the MIT license.
+ */
+(function(chars){
+  "use strict";
+
+  exports.encode = function(arraybuffer) {
+    var bytes = new Uint8Array(arraybuffer),
+    i, len = bytes.length, base64 = "";
+
+    for (i = 0; i < len; i+=3) {
+      base64 += chars[bytes[i] >> 2];
+      base64 += chars[((bytes[i] & 3) << 4) | (bytes[i + 1] >> 4)];
+      base64 += chars[((bytes[i + 1] & 15) << 2) | (bytes[i + 2] >> 6)];
+      base64 += chars[bytes[i + 2] & 63];
+    }
+
+    if ((len % 3) === 2) {
+      base64 = base64.substring(0, base64.length - 1) + "=";
+    } else if (len % 3 === 1) {
+      base64 = base64.substring(0, base64.length - 2) + "==";
+    }
+
+    return base64;
+  };
+
+  exports.decode =  function(base64) {
+    var bufferLength = base64.length * 0.75,
+    len = base64.length, i, p = 0,
+    encoded1, encoded2, encoded3, encoded4;
+
+    if (base64[base64.length - 1] === "=") {
+      bufferLength--;
+      if (base64[base64.length - 2] === "=") {
+        bufferLength--;
+      }
+    }
+
+    var arraybuffer = new ArrayBuffer(bufferLength),
+    bytes = new Uint8Array(arraybuffer);
+
+    for (i = 0; i < len; i+=4) {
+      encoded1 = chars.indexOf(base64[i]);
+      encoded2 = chars.indexOf(base64[i+1]);
+      encoded3 = chars.indexOf(base64[i+2]);
+      encoded4 = chars.indexOf(base64[i+3]);
+
+      bytes[p++] = (encoded1 << 2) | (encoded2 >> 4);
+      bytes[p++] = ((encoded2 & 15) << 4) | (encoded3 >> 2);
+      bytes[p++] = ((encoded3 & 3) << 6) | (encoded4 & 63);
+    }
+
+    return arraybuffer;
+  };
+})("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/");
+
+},{}],3:[function(require,module,exports){
 /*jshint bitwise:false*/
 /*global unescape*/
 
@@ -20,6 +211,7 @@
         glob.SparkMD5 = factory();
     }
 }(function (undefined) {
+
     'use strict';
 
     ////////////////////////////////////////////////////////////////////////////
@@ -288,6 +480,8 @@
         return hex(md51(s));
     },
 
+
+
     ////////////////////////////////////////////////////////////////////////////
 
     /**
@@ -297,6 +491,285 @@
      * static methods instead.
      */
     SparkMD5 = function () {
+        // call reset to init the instance
+        this.reset();
+    };
+
+
+    // In some cases the fast add32 function cannot be used..
+    if (md5('hello') !== '5d41402abc4b2a76b9719d911017c592') {
+        add32 = function (x, y) {
+            var lsw = (x & 0xFFFF) + (y & 0xFFFF),
+                msw = (x >> 16) + (y >> 16) + (lsw >> 16);
+            return (msw << 16) | (lsw & 0xFFFF);
+        };
+    }
+
+
+    /**
+     * Appends a string.
+     * A conversion will be applied if an utf8 string is detected.
+     *
+     * @param {String} str The string to be appended
+     *
+     * @return {SparkMD5} The instance itself
+     */
+    SparkMD5.prototype.append = function (str) {
+        // converts the string to utf8 bytes if necessary
+        if (/[\u0080-\uFFFF]/.test(str)) {
+            str = unescape(encodeURIComponent(str));
+        }
+
+        // then append as binary
+        this.appendBinary(str);
+
+        return this;
+    };
+
+    /**
+     * Appends a binary string.
+     *
+     * @param {String} contents The binary string to be appended
+     *
+     * @return {SparkMD5} The instance itself
+     */
+    SparkMD5.prototype.appendBinary = function (contents) {
+        this._buff += contents;
+        this._length += contents.length;
+
+        var length = this._buff.length,
+            i;
+
+        for (i = 64; i <= length; i += 64) {
+            md5cycle(this._state, md5blk(this._buff.substring(i - 64, i)));
+        }
+
+        this._buff = this._buff.substr(i - 64);
+
+        return this;
+    };
+
+    /**
+     * Finishes the incremental computation, reseting the internal state and
+     * returning the result.
+     * Use the raw parameter to obtain the raw result instead of the hex one.
+     *
+     * @param {Boolean} raw True to get the raw result, false to get the hex result
+     *
+     * @return {String|Array} The result
+     */
+    SparkMD5.prototype.end = function (raw) {
+        var buff = this._buff,
+            length = buff.length,
+            i,
+            tail = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            ret;
+
+        for (i = 0; i < length; i += 1) {
+            tail[i >> 2] |= buff.charCodeAt(i) << ((i % 4) << 3);
+        }
+
+        this._finish(tail, length);
+        ret = !!raw ? this._state : hex(this._state);
+
+        this.reset();
+
+        return ret;
+    };
+
+    /**
+     * Finish the final calculation based on the tail.
+     *
+     * @param {Array}  tail   The tail (will be modified)
+     * @param {Number} length The length of the remaining buffer
+     */
+    SparkMD5.prototype._finish = function (tail, length) {
+        var i = length,
+            tmp,
+            lo,
+            hi;
+
+        tail[i >> 2] |= 0x80 << ((i % 4) << 3);
+        if (i > 55) {
+            md5cycle(this._state, tail);
+            for (i = 0; i < 16; i += 1) {
+                tail[i] = 0;
+            }
+        }
+
+        // Do the final computation based on the tail and length
+        // Beware that the final length may not fit in 32 bits so we take care of that
+        tmp = this._length * 8;
+        tmp = tmp.toString(16).match(/(.*?)(.{0,8})$/);
+        lo = parseInt(tmp[2], 16);
+        hi = parseInt(tmp[1], 16) || 0;
+
+        tail[14] = lo;
+        tail[15] = hi;
+        md5cycle(this._state, tail);
+    };
+
+    /**
+     * Resets the internal state of the computation.
+     *
+     * @return {SparkMD5} The instance itself
+     */
+    SparkMD5.prototype.reset = function () {
+        this._buff = "";
+        this._length = 0;
+        this._state = [1732584193, -271733879, -1732584194, 271733878];
+
+        return this;
+    };
+
+    /**
+     * Releases memory used by the incremental buffer and other aditional
+     * resources. If you plan to use the instance again, use reset instead.
+     */
+    SparkMD5.prototype.destroy = function () {
+        delete this._state;
+        delete this._buff;
+        delete this._length;
+    };
+
+
+    /**
+     * Performs the md5 hash on a string.
+     * A conversion will be applied if utf8 string is detected.
+     *
+     * @param {String}  str The string
+     * @param {Boolean} raw True to get the raw result, false to get the hex result
+     *
+     * @return {String|Array} The result
+     */
+    SparkMD5.hash = function (str, raw) {
+        // converts the string to utf8 bytes if necessary
+        if (/[\u0080-\uFFFF]/.test(str)) {
+            str = unescape(encodeURIComponent(str));
+        }
+
+        var hash = md51(str);
+
+        return !!raw ? hash : hex(hash);
+    };
+
+    /**
+     * Performs the md5 hash on a binary string.
+     *
+     * @param {String}  content The binary string
+     * @param {Boolean} raw     True to get the raw result, false to get the hex result
+     *
+     * @return {String|Array} The result
+     */
+    SparkMD5.hashBinary = function (content, raw) {
+        var hash = md51(content);
+
+        return !!raw ? hash : hex(hash);
+    };
+
+    /**
+     * SparkMD5 OOP implementation for array buffers.
+     *
+     * Use this class to perform an incremental md5 ONLY for array buffers.
+     */
+    SparkMD5.ArrayBuffer = function () {
+        // call reset to init the instance
+        this.reset();
+    };
+
+    ////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * Appends an array buffer.
+     *
+     * @param {ArrayBuffer} arr The array to be appended
+     *
+     * @return {SparkMD5.ArrayBuffer} The instance itself
+     */
+    SparkMD5.ArrayBuffer.prototype.append = function (arr) {
+        // TODO: we could avoid the concatenation here but the algorithm would be more complex
+        //       if you find yourself needing extra performance, please make a PR.
+        var buff = this._concatArrayBuffer(this._buff, arr),
+            length = buff.length,
+            i;
+
+        this._length += arr.byteLength;
+
+        for (i = 64; i <= length; i += 64) {
+            md5cycle(this._state, md5blk_array(buff.subarray(i - 64, i)));
+        }
+
+        // Avoids IE10 weirdness (documented above)
+        this._buff = (i - 64) < length ? buff.subarray(i - 64) : new Uint8Array(0);
+
+        return this;
+    };
+
+    /**
+     * Finishes the incremental computation, reseting the internal state and
+     * returning the result.
+     * Use the raw parameter to obtain the raw result instead of the hex one.
+     *
+     * @param {Boolean} raw True to get the raw result, false to get the hex result
+     *
+     * @return {String|Array} The result
+     */
+    SparkMD5.ArrayBuffer.prototype.end = function (raw) {
+        var buff = this._buff,
+            length = buff.length,
+            tail = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            i,
+            ret;
+
+        for (i = 0; i < length; i += 1) {
+            tail[i >> 2] |= buff[i] << ((i % 4) << 3);
+        }
+
+        this._finish(tail, length);
+        ret = !!raw ? this._state : hex(this._state);
+
+        this.reset();
+
+        return ret;
+    };
+
+    SparkMD5.ArrayBuffer.prototype._finish = SparkMD5.prototype._finish;
+
+    /**
+     * Resets the internal state of the computation.
+     *
+     * @return {SparkMD5.ArrayBuffer} The instance itself
+     */
+    SparkMD5.ArrayBuffer.prototype.reset = function () {
+        this._buff = new Uint8Array(0);
+        this._length = 0;
+        this._state = [1732584193, -271733879, -1732584194, 271733878];
+
+        return this;
+    };
+
+    /**
+     * Releases memory used by the incremental buffer and other aditional
+     * resources. If you plan to use the instance again, use reset instead.
+     */
+    SparkMD5.ArrayBuffer.prototype.destroy = SparkMD5.prototype.destroy;
+
+    /**
+     * Concats two array buffers, returning a new one.
+     *
+     * @param  {ArrayBuffer} first  The first array buffer
+     * @param  {ArrayBuffer} second The second array buffer
+     *
+     * @return {ArrayBuffer} The new array buffer
+     */
+    SparkMD5.ArrayBuffer.prototype._concatArrayBuffer = function (first, second) {
+        var firstLength = first.length,
+            result = new Uint8Array(firstLength + second.byteLength);
+
+        result.set(first);
+        result.set(new Uint8Array(second), firstLength);
+
+        return result;
     };
 
     /**
@@ -304,120 +777,16 @@
      *
      * @param {ArrayBuffer} arr The array buffer
      * @param {Boolean}     raw True to get the raw result, false to get the hex result
-     * @param {Number}    start The byteOffset
-     * @param {Number}    length The byteOffset
      *
      * @return {String|Array} The result
      */
-    SparkMD5.hash = function (arr, raw) {
-        var hash = md51_array(arr);
+    SparkMD5.ArrayBuffer.hash = function (arr, raw) {
+        var hash = md51_array(new Uint8Array(arr));
+
         return !!raw ? hash : hex(hash);
     };
 
     return SparkMD5;
 }));
 
-(function () {
-'use strict';
-angular.module('angular.file', [])
-    .factory('fileOperator', ['$window', '$q', function ($window, $q) {
-        var fileReader = new $window.FileReader();
-
-        function FileOperator (file) {
-            this.file = file;
-            this.buffer = null;
-            this.fileSize = 0;
-            this.status = 'init';
-            this.messages = [];
-        }
-        FileOperator.prototype.read = function (start, end) {
-            var that = this;
-            return $q(function (resolve, reject) {
-                if(!that.file) {
-                    return reject(new Error('read','invalid file instance'));
-                }
-                // bind onloadend handler 
-                fileReader.onloadend = function (msg) {
-                    that.buffer = fileReader.result;
-                    that.fileSize = that.buffer.byteLength;
-                    resolve('file loaded');
-                };
-                fileReader.onerror = function (msg) {
-                    reject(new Error('read', msg));
-                };
-                fileReader.onabort = function (msg) {
-                    resolve(msg);
-                };
-                if(start || end) {
-                    start = start ? 0 : start;
-                    if(end) {
-                        fileReader.readAsArrayBuffer(that.file.slice(start, end));
-                    } else {
-                        fileReader.readAsArrayBuffer(that.file.slice(start));
-                    }
-                } else {
-                    fileReader.readAsArrayBuffer(that.file);
-                }
-            });
-        };
-        FileOperator.prototype.abort = function () {
-            fileReader.abort();
-        };
-        FileOperator.prototype.getArrayBuffer = function (start, length) {
-            if(start === 0 && length === this.fileSize) {
-                // if user request for the whole arraybuffer, return it 
-                // directly to avoid memory copy
-                return this.buffer;
-            }
-            return this.buffer.slice(start, start + length);
-        };
-        FileOperator.prototype.getUint8Array = function (start, length) {
-            var range = getRange(start, length, this.fileSize);
-            return new Uint8Array(this.buffer, range[0], range[1]);
-        };
-        FileOperator.prototype.getBase64 = function (start, length) {
-            return toBase64(this.getUint8Array(start, length));
-        };
-        FileOperator.prototype.getMd5 = function (start, length) {
-            return md5(this.getUint8Array(start, length));
-        };
-
-        return function ServiceConstructor(file) {
-            // When invoke this service, it will return a function,
-            // service user can use it as a file loader, which will
-            // return a file operator instance 
-            return new FileOperator(file);
-        };
-
-        // Private Functions
-        function getRange (start, length, fileSize) {
-            start = (start && (start > 0)) ? start : 0;
-            length = (length && (start + length < fileSize)) ? length : fileSize - start;
-            return [start, length];
-        }
-        // Function below is from base64-arraybuffer
-        //   https://github.com/niklasvh/base64-arraybuffer
-        function toBase64 (bytes) {
-            var i, len = bytes.length, base64 = "",
-                chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-            for (i = 0; i < len; i+=3) {
-              base64 += chars[bytes[i] >> 2];
-              base64 += chars[((bytes[i] & 3) << 4) | (bytes[i + 1] >> 4)];
-              base64 += chars[((bytes[i + 1] & 15) << 2) | (bytes[i + 2] >> 6)];
-              base64 += chars[bytes[i + 2] & 63];
-            }
-
-            if ((len % 3) === 2) {
-              base64 = base64.substring(0, base64.length - 1) + "=";
-            } else if (len % 3 === 1) {
-              base64 = base64.substring(0, base64.length - 2) + "==";
-            }
-
-            return base64;
-        }
-        function md5 (bytes) {
-            return SparkMD5.hash(bytes);
-        }
-    }]);
-})();
+},{}]},{},[1]);

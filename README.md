@@ -28,55 +28,39 @@ app.controller('myController', ['$document', 'fileOperator', function ($document
     // pass to fileOperator, now you got the file interface
     var file = fileOperator(fileOnDom);
 
-    // read the file, it will return a promise
-    file.read().then(function () {
-        // once the promise resolved, you start to get data
-        var b64_content = file.getBase64();
-        // ...
+    // read the file as desired format
+    file.getBase64().then(function (result) {
+        console.log('File content in Base64:', result);
     });
 
 }]);
 ```
 
-file interface has these operators:
+the service is a function, you'll get a wrapped file operator once you pass
+file to it, it accepts two arguments:
 
-- `read([start, [end]])`: read a chunk start from `start` to `end` (excluded),
-   return a promise which will be resolved once the file is fully loaded,
-   and will be rejected if something goes wrong
-- `abort`: cancel the loading process and **resolve** the promise.
+- `file`: the file instance from Web API `File` interface
+- `maxChunkSize` (optional, Default is 1MB): when calculating MD5, if the file
+  is larger than maxChunkSize, `fileOperator` will do the incrementall
+  calculation instead of loading the whole file into memory.
+
+file operator has this method:
+
+- `abort`: cancel the loading process and **reject** the promise.
 
 and these getters:
 
 - `getBase64([start, [legth]])`
 - `getMd5([start, [legth]])`
 - `getUint8Array([start, [legth]])`
-- `getArrayBuffer([start, [legth]])` (**May cause memory copy if `length` and `start` are given,
-   use carefully if file is huge**)
-
-one important detail is that `start` and `length` in getters are based on the
-current slice, not the whole file. So if you:
-
-```javascript
-// Read part of the file
-file.read(100, 500).then(function () {
-    var base64 = file.getBase64(50, 100);
-    // the base64 string is the data from (50th to 100th) byte
-    // of current slice, so it is the (100+50)th to (100+50+100)th byte
-    // in the original file
-});
-```
+- `getArrayBuffer([start, [legth]])` 
 
 file interface has these properties:
 - `file`: the file you passed in
 - `fileSize`: once the file is loaded, it represent the file size in bytes
-- `buffer`: the buffer of the file, same result as `getArrayBuffer()`
 - `messages`: all messages from File API
 
 ## Credit
-
-In order to avoid uneccesary memory copy, some modification has been 
-done to the modules below, so a modified version is packed in thie moudle
-instead of the original one.
 
 - base64 encoder is from [base64-bufferarray]()
 - md5 encoder is from [SparkMD5]()
