@@ -1,6 +1,6 @@
 {
   "name": "angular-file-service",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "description": "an angular service for operating File",
   "main": "dist/angular-file-service.js",
   "scripts": {
