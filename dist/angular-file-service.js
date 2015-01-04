@@ -52,7 +52,7 @@ angular.module('angular.file', [])
         };
         FileOperator.prototype.getUint8Array = function (start, length) {
             return this.getArrayBuffer(start, length).then(function (array) {
-                return new Unit8Array(array);
+                return new Uint8Array(array);
             });
         };
         FileOperator.prototype.getBase64 = function (start, length) {
@@ -67,11 +67,9 @@ angular.module('angular.file', [])
 
             // if require length is acceptable, get MD5 directly
             if(length < this.maxChunkSize) {
-                return $q.when(
-                    SparkMD5.ArrayBuffer.hash(
-                        this.getUint8Array(start, length)
-                    )
-                );
+                return this.getArrayBuffer(start, length).then(function (data) {
+                    return $q.when(SparkMD5.ArrayBuffer.hash(data));
+                });
             }
             // otherwise calculate MD5 incrementally
             return this.incMd5(start, length);
