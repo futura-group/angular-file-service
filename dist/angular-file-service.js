@@ -13,12 +13,13 @@ angular.module('angular.file', [])
         FileOperator.prototype.read = function (start, end) {
             var that = this;
             var fileReader = new $window.FileReader();
-            return $q(function (resolve, reject) {
+            var d = $q.defer();
+            (function (resolve, reject) {
                 var fileChunk;
                 if(!that.file) {
                     return reject(new Error('read','invalid file instance'));
                 }
-                // bind onloadend handler 
+                // bind onloadend handler
                 fileReader.onloadend = function (msg) {
                     resolve(fileReader.result);
                 };
@@ -34,12 +35,13 @@ angular.module('angular.file', [])
                 // - only `start` is given
                 // - both `start` and `end` are given
                 fileChunk = $window.File.prototype.slice.apply(
-                    that.file, 
+                    that.file,
                     [start, end]
                 );
 
                 fileReader.readAsArrayBuffer(fileChunk);
-            });
+            })(d.resolve, d.reject);
+            return d.promise;
         };
         FileOperator.prototype.abort = function () {
             fileReader.abort();
@@ -119,7 +121,7 @@ angular.module('angular.file', [])
         return function ServiceConstructor(file, maxChunkSize) {
             // When invoke this service, it will return a function,
             // service user can use it as a file loader, which will
-            // return a file operator instance 
+            // return a file operator instance
             return new FileOperator(file, maxChunkSize);
         };
 
